@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Drilldown Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .breadcrumb-item {
+            color: #667eea;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        
+        .breadcrumb-item:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .breadcrumb-item.active {
+            color: #333;
+            cursor: default;
+            font-weight: 700;
+        }
+        
+        .breadcrumb-separator {
+            color: #999;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin-bottom: 20px;
+        }
+        
+        canvas {
+            cursor: pointer;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-card .label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .instruction {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            margin-top: 20px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .container {
+            animation: fadeIn 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Performance Drilldown Dashboard</h1>
+        </div>
+        
+        <div class="breadcrumb" id="breadcrumb">
+            <span class="breadcrumb-item active" onclick="navigateToCompany()">🏢 Company</span>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+        
+        <div class="info-box" id="infoBox">
+            <h3>ℹ️ Instructions</h3>
+            <p><strong>Click on any bar</strong> to drill down into details.</p>
+            <p><strong>Use breadcrumb navigation</strong> above to go back to previous levels.</p>
+        </div>
+        
+        <div class="stats-grid" id="statsGrid"></div>
+        
+        <div class="instruction">
+            💡 Tip: Click on chart bars to explore team and member details
+        </div>
+    </div>
+
+    <script>
+        // Sample data structure
+        const companyData = {
+            name: "TechCorp",
+            overall: 85,
+            teams: [
+                {
+                    name: "Engineering",
+                    performance: 88,
+                    members: [
+                        { name: "Alice Johnson", performance: 92, projects: 8, hoursWorked: 160 },
+                        { name: "Bob Smith", performance: 85, projects: 6, hoursWorked: 155 },
+                        { name: "Carol Davis", performance: 90, projects: 7, hoursWorked: 165 },
+                        { name: "David Lee", performance: 86, projects: 5, hoursWorked: 150 }
+                    ]
+                },
+                {
+                    name: "Sales",
+                    performance: 82,
+                    members: [
+                        { name: "Emma Wilson", performance: 88, deals: 12, revenue: 450000 },
+                        { name: "Frank Brown", performance: 78, deals: 9, revenue: 380000 },
+                        { name: "Grace Taylor", performance: 85, deals: 11, revenue: 420000 },
+                        { name: "Henry Martinez", performance: 77, deals: 8, revenue: 350000 }
+                    ]
+                },
+                {
+                    name: "Marketing",
+                    performance: 86,
+                    members: [
+                        { name: "Ivy Anderson", performance: 89, campaigns: 15, reach: 2500000 },
+                        { name: "Jack Thompson", performance: 84, campaigns: 12, reach: 2100000 },
+                        { name: "Kate Garcia", performance: 87, campaigns: 14, reach: 2300000 }
+                    ]
+                },
+                {
+                    name: "Design",
+                    performance: 84,
+                    members: [
+                        { name: "Liam Rodriguez", performance: 90, designs: 45, satisfaction: 4.8 },
+                        { name: "Mia Hernandez", performance: 82, designs: 38, satisfaction: 4.5 },
+                        { name: "Noah Lopez", performance: 80, designs: 35, satisfaction: 4.3 }
+                    ]
+                }
+            ]
+        };
+
+        let currentLevel = 'company';
+        let currentTeam = null;
+        let chart = null;
+
+        function initChart() {
+            const ctx = document.getElementById('myChart');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Performance Score',
+                        data: [],
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(237, 100, 166, 0.8)',
+                            'rgba(255, 154, 158, 0.8)',
+                            'rgba(250, 208, 196, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(102, 126, 234, 1)',
+                            'rgba(118, 75, 162, 1)',
+                            'rgba(237, 100, 166, 1)',
+                            'rgba(255, 154, 158, 1)',
+                            'rgba(250, 208, 196, 1)'
+                        ],
+                        borderWidth: 2,
+                        borderRadius: 10,
+                        hoverBackgroundColor: [
+                            'rgba(102, 126, 234, 1)',
+                            'rgba(118, 75, 162, 1)',
+                            'rgba(237, 100, 166, 1)',
+                            'rgba(255, 154, 158, 1)',
+                            'rgba(250, 208, 196, 1)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    onClick: handleChartClick,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 16
+                            },
+                            bodyFont: {
+                                size: 14
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Performance: ' + context.parsed.y + '%';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                },
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 750,
+                        easing: 'easeInOutQuart'
+                    }
+                }
+            });
+
+            showCompanyLevel();
+        }
+
+        function handleChartClick(event, elements) {
+            if (elements.length === 0) return;
+
+            const index = elements[0].index;
+
+            if (currentLevel === 'company') {
+                // Drill down to team level
+                currentTeam = companyData.teams[index];
+                showTeamLevel(currentTeam);
+            } else if (currentLevel === 'team') {
+                // Drill down to member level
+                const member = currentTeam.members[index];
+                showMemberLevel(member);
+            }
+        }
+
+        function showCompanyLevel() {
+            currentLevel = 'company';
+            currentTeam = null;
+
+            const labels = companyData.teams.map(team => team.name);
+            const data = companyData.teams.map(team => team.performance);
+
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.data.datasets[0].label = 'Team Performance Score';
+            chart.update();
+
+            updateBreadcrumb();
+            updateInfoBox(`
+                <h3>🏢 Company Overview: ${companyData.name}</h3>
+                <p><strong>Overall Performance:</strong> ${companyData.overall}%</p>
+                <p><strong>Total Teams:</strong> ${companyData.teams.length}</p>
+                <p>Click on any team to see individual members.</p>
+            `);
+
+            updateStats([
+                { label: 'Overall Score', value: companyData.overall + '%' },
+                { label: 'Teams', value: companyData.teams.length },
+                { label: 'Total Members', value: companyData.teams.reduce((sum, t) => sum + t.members.length, 0) },
+                { label: 'Avg Team Performance', value: Math.round(data.reduce((a, b) => a + b, 0) / data.length) + '%' }
+            ]);
+        }
+
+        function showTeamLevel(team) {
+            currentLevel = 'team';
+
+            const labels = team.members.map(member => member.name);
+            const data = team.members.map(member => member.performance);
+
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.data.datasets[0].label = team.name + ' - Member Performance';
+            chart.update();
+
+            updateBreadcrumb(team.name);
+            updateInfoBox(`
+                <h3>👥 Team: ${team.name}</h3>
+                <p><strong>Team Performance:</strong> ${team.performance}%</p>
+                <p><strong>Team Members:</strong> ${team.members.length}</p>
+                <p>Click on any member to see detailed information.</p>
+            `);
+
+            updateStats([
+                { label: 'Team Performance', value: team.performance + '%' },
+                { label: 'Team Members', value: team.members.length },
+                { label: 'Top Performer', value: Math.max(...data) + '%' },
+                { label: 'Avg Member Performance', value: Math.round(data.reduce((a, b) => a + b, 0) / data.length) + '%' }
+            ]);
+        }
+
+        function showMemberLevel(member) {
+            currentLevel = 'member';
+
+            // Create a simple visualization for member details
+            const keys = Object.keys(member).filter(k => k !== 'name' && k !== 'performance');
+            const labels = keys.map(k => k.charAt(0).toUpperCase() + k.slice(1));
+            const data = keys.map(k => typeof member[k] === 'number' ? member[k] : 0);
+
+            // Normalize large numbers for better visualization
+            const normalizedData = data.map(val => {
+                if (val > 1000) return Math.round(val / 1000);
+                return val;
+            });
+
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = normalizedData;
+            chart.data.datasets[0].label = member.name + ' - Metrics';
+            chart.options.scales.y.max = null;
+            chart.options.scales.y.ticks.callback = function(value) {
+                return value;
+            };
+            chart.update();
+
+            updateBreadcrumb(currentTeam.name, member.name);
+            
+            let detailsHtml = `
+                <h3>👤 Member: ${member.name}</h3>
+                <p><strong>Performance Score:</strong> ${member.performance}%</p>
+            `;
+            
+            keys.forEach(key => {
+                const displayKey = key.charAt(0).toUpperCase() + key.slice(1);
+                let displayValue = member[key];
+                if (key.includes('revenue')) {
+                    displayValue = '$' + displayValue.toLocaleString();
+                } else if (key.includes('reach')) {
+                    displayValue = displayValue.toLocaleString();
+                }
+                detailsHtml += `<p><strong>${displayKey}:</strong> ${displayValue}</p>`;
+            });
+
+            updateInfoBox(detailsHtml);
+
+            const statsData = [
+                { label: 'Performance', value: member.performance + '%' },
+                ...keys.slice(0, 3).map(key => {
+                    let value = member[key];
+                    if (key.includes('revenue')) value = '$' + (value / 1000).toFixed(0) + 'K';
+                    else if (key.includes('reach')) value = (value / 1000000).toFixed(1) + 'M';
+                    return { 
+                        label: key.charAt(0).toUpperCase() + key.slice(1), 
+                        value: value 
+                    };
+                })
+            ];
+
+            updateStats(statsData);
+        }
+
+        function updateBreadcrumb(teamName = null, memberName = null) {
+            const breadcrumb = document.getElementById('breadcrumb');
+            let html = '<span class="breadcrumb-item" onclick="navigateToCompany()">🏢 Company</span>';
+
+            if (teamName) {
+                html += '<span class="breadcrumb-separator">›</span>';
+                html += `<span class="breadcrumb-item ${!memberName ? 'active' : ''}" onclick="navigateToTeam()">${teamName}</span>`;
+            }
+
+            if (memberName) {
+                html += '<span class="breadcrumb-separator">›</span>';
+                html += `<span class="breadcrumb-item active">${memberName}</span>`;
+            }
+
+            breadcrumb.innerHTML = html;
+        }
+
+        function updateInfoBox(html) {
+            document.getElementById('infoBox').innerHTML = html;
+        }
+
+        function updateStats(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = stats.map(stat => `
+                <div class="stat-card">
+                    <div class="value">${stat.value}</div>
+                    <div class="label">${stat.label}</div>
+                </div>
+            `).join('');
+        }
+
+        function navigateToCompany() {
+            showCompanyLevel();
+        }
+
+        function navigateToTeam() {
+            if (currentTeam) {
+                showTeamLevel(currentTeam);
+            }
+        }
+
+        // Initialize the chart when page loads
+        window.addEventListener('load', initChart);
+    </script>
+</body>
+</html>
